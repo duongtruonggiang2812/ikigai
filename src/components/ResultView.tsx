@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { IkigaiResult } from "@/lib/types"
 import VennDiagram from "./VennDiagram"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
 const LEVEL_STYLE: Record<string, string> = {
   Thấp: "bg-red-100 text-red-700 border-red-200",
@@ -33,11 +35,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-export default function ResultView() {
-  const [result, setResult] = useState<IkigaiResult | null>(null)
+export default function ResultView({ result: resultProp }: { result?: IkigaiResult }) {
+  const [result, setResult] = useState<IkigaiResult | null>(resultProp ?? null)
   const [error, setError] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [saved, setSaved] = useState(!!resultProp)
 
   useEffect(() => {
+    // If result passed as prop (from DB), skip localStorage
+    if (resultProp) return
     try {
       const raw = localStorage.getItem("ikigai_result")
       if (!raw) { setError(true); return }
@@ -45,6 +51,13 @@ export default function ResultView() {
     } catch {
       setError(true)
     }
+  }, [resultProp])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    // If user is logged in and result came from this session, it was already saved by API
+    if (!resultProp) setSaved(false)
   }, [])
 
   if (error) {
@@ -77,6 +90,17 @@ export default function ResultView() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Save / Login banner */}
+      {!resultProp && (
+        <div className={`px-4 py-2.5 text-center text-xs font-semibold ${user ? "bg-green-500 text-white" : "bg-orange-100 text-orange-700"}`}>
+          {user ? (
+            <>✅ Kết quả đã được lưu vào tài khoản của bạn · <Link href="/dashboard" className="underline">Xem tất cả kết quả</Link></>
+          ) : (
+            <><Link href="/login" className="underline font-bold">Đăng nhập</Link> để lưu kết quả này và xem lại bất cứ lúc nào</>
+          )}
+        </div>
+      )}
 
       {/* Hero header */}
       <div className="bg-gradient-to-br from-orange-500 via-orange-400 to-amber-400 text-white px-4 pt-12 pb-10">
