@@ -24,3 +24,51 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-14px); }
+}
+
+@keyframes floatYSlow {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes shimmer {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(150%); }
+}
+
+@layer utilities {
+  .animate-fade-up {
+    animation: fadeSlideIn 0.35s ease-out both;
+  }
+
+  .animate-float {
+    animation: floatY 4s ease-in-out infinite;
+  }
+
+  .animate-float-slow {
+    animation: floatYSlow 6s ease-in-out 1.2s infinite;
+  }
+
+  .btn-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.28) 50%, transparent 100%);
+    transform: translateX(-150%);
+    animation: shimmer 2.8s ease-in-out infinite;
+  }
+}

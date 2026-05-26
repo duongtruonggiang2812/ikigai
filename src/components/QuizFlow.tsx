@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { IKIGAI9_STATEMENTS, PILLARS, PillarKey, STATUS_OPTIONS } from "@/lib/questions"
 import { QuizAnswers, UserProfile } from "@/lib/types"
@@ -10,17 +10,51 @@ type Phase = "profile" | "ikigai9" | PillarKey | "loading"
 const PHASE_ORDER: Phase[] = ["profile", "ikigai9", "love", "strength", "mission", "income"]
 const PROGRESS_STEPS: Phase[] = ["ikigai9", "love", "strength", "mission", "income"]
 
+const LOADING_MSGS = [
+  "Đang đọc câu trả lời của bạn...",
+  "Phân tích 4 trụ cột Ikigai...",
+  "Tìm điểm giao thoa đặc biệt...",
+  "Gợi ý nghề nghiệp phù hợp...",
+  "Viết thư cá nhân cho bạn...",
+  "Hoàn thiện báo cáo...",
+]
+
+// Static color classes for Ikigai-9 scale (1–7)
+const SCALE_SELECTED = [
+  "",
+  "bg-red-500 text-white border-red-500 shadow-lg shadow-red-200",
+  "bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-200",
+  "bg-amber-400 text-white border-amber-400 shadow-lg shadow-amber-200",
+  "bg-yellow-400 text-white border-yellow-400 shadow-lg shadow-yellow-200",
+  "bg-lime-500 text-white border-lime-500 shadow-lg shadow-lime-200",
+  "bg-green-500 text-white border-green-500 shadow-lg shadow-green-200",
+  "bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-200",
+]
+
+const PHASE_LABELS: Partial<Record<Phase, string>> = {
+  ikigai9: "Ikigai-9",
+  love: "Yêu thích",
+  strength: "Sở trường",
+  mission: "Sứ mệnh",
+  income: "Hướng đi",
+}
+
 function ProgressBar({ phase }: { phase: Phase }) {
   const current = PROGRESS_STEPS.indexOf(phase as Phase)
   if (current === -1) return null
   return (
-    <div className="flex gap-1.5 px-4 py-3">
-      {PROGRESS_STEPS.map((_, i) => (
-        <div
-          key={i}
-          className={`h-1 flex-1 rounded-full transition-colors ${i <= current ? "bg-orange-500" : "bg-gray-200"}`}
-        />
-      ))}
+    <div className="px-4 pt-3 pb-1">
+      <div className="flex gap-1.5 mb-1.5">
+        {PROGRESS_STEPS.map((_, i) => (
+          <div
+            key={i}
+            className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i <= current ? "bg-orange-500" : "bg-gray-100"}`}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-gray-400 text-right">
+        Bước {current + 1}/{PROGRESS_STEPS.length} · {PHASE_LABELS[phase]}
+      </p>
     </div>
   )
 }
@@ -40,6 +74,14 @@ export default function QuizFlow() {
     income: Array(5).fill(""),
   })
   const [error, setError] = useState("")
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0)
+
+  // Cycle loading messages
+  useEffect(() => {
+    if (phase !== "loading") return
+    const id = setInterval(() => setLoadingMsgIdx((p) => (p + 1) % LOADING_MSGS.length), 2400)
+    return () => clearInterval(id)
+  }, [phase])
 
   function setIkigai9(index: number, value: number) {
     setAnswers((prev) => {
@@ -64,6 +106,12 @@ export default function QuizFlow() {
     return answers[key].filter((v) => v.trim().length > 0).length >= 2
   }
 
+  function goBack() {
+    setError("")
+    const idx = PHASE_ORDER.indexOf(phase)
+    if (idx > 0) setPhase(PHASE_ORDER[idx - 1])
+  }
+
   function advance() {
     setError("")
     if (!canAdvance()) {
@@ -72,9 +120,7 @@ export default function QuizFlow() {
       else setError("Hãy trả lời ít nhất 2 câu hỏi để tiếp tục.")
       return
     }
-    if (phase === "profile") {
-      setAnswers((prev) => ({ ...prev, profile }))
-    }
+    if (phase === "profile") setAnswers((prev) => ({ ...prev, profile }))
     const idx = PHASE_ORDER.indexOf(phase)
     if (idx < PHASE_ORDER.length - 1) {
       setPhase(PHASE_ORDER[idx + 1])
@@ -105,11 +151,29 @@ export default function QuizFlow() {
   // ── LOADING ──
   if (phase === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50">
-        <div className="text-center">
-          <div className="text-5xl mb-6 animate-pulse">🌸</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">AI đang phân tích...</h2>
-          <p className="text-sm text-gray-500">Đang tạo báo cáo Ikigai của bạn, vài giây thôi nhé</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 px-4">
+        <div className="text-center max-w-xs animate-fade-up">
+          <div className="text-6xl mb-6 animate-bounce">🌸</div>
+          <h2 className="text-xl font-black text-gray-800 mb-2">AI đang phân tích...</h2>
+          <p className="text-sm text-orange-500 font-semibold mb-8 min-h-[20px] transition-all duration-500">
+            {LOADING_MSGS[loadingMsgIdx]}
+          </p>
+          {/* Step dots */}
+          <div className="flex justify-center gap-2 mb-6">
+            {LOADING_MSGS.map((_, i) => (
+              <div
+                key={i}
+                className={`rounded-full transition-all duration-300 ${
+                  i === loadingMsgIdx
+                    ? "w-6 h-2.5 bg-orange-500"
+                    : i < loadingMsgIdx
+                    ? "w-2.5 h-2.5 bg-orange-300"
+                    : "w-2.5 h-2.5 bg-gray-200"
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">Thường mất 15–30 giây</p>
         </div>
       </div>
     )
@@ -119,17 +183,16 @@ export default function QuizFlow() {
   if (phase === "profile") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center px-4 py-10">
-        <div className="max-w-md w-full">
+        <div className="max-w-md w-full animate-fade-up">
           <div className="text-center mb-6">
             <div className="text-4xl mb-3">👋</div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Trước khi bắt đầu</h1>
+            <h1 className="text-2xl font-black text-gray-900 mb-1">Trước khi bắt đầu</h1>
             <p className="text-sm text-gray-500">Cho mình biết thêm về bạn để báo cáo Ikigai được cá nhân hóa hơn</p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
-            {/* Name */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
                 Tên của bạn <span className="text-orange-500">*</span>
               </label>
               <input
@@ -141,9 +204,8 @@ export default function QuizFlow() {
               />
             </div>
 
-            {/* Birth year */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Năm sinh</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">Năm sinh</label>
               <input
                 type="text"
                 value={profile.birthYear}
@@ -154,9 +216,8 @@ export default function QuizFlow() {
               />
             </div>
 
-            {/* Status */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Hiện tại bạn đang...</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">Hiện tại bạn đang...</label>
               <select
                 value={profile.status}
                 onChange={(e) => setProfile({ ...profile, status: e.target.value })}
@@ -169,9 +230,8 @@ export default function QuizFlow() {
               </select>
             </div>
 
-            {/* Occupation */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
                 {profile.status.includes("làm") ? "Công việc hiện tại" : "Ngành học / Trường"}
               </label>
               <input
@@ -183,9 +243,8 @@ export default function QuizFlow() {
               />
             </div>
 
-            {/* Goal */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
                 Điều bạn muốn tìm ra qua bài quiz này?
               </label>
               <textarea
@@ -202,7 +261,7 @@ export default function QuizFlow() {
 
           <button
             onClick={advance}
-            className="mt-5 w-full bg-orange-500 text-white py-3 rounded-2xl font-semibold text-sm hover:bg-orange-600 transition-colors shadow-md shadow-orange-100"
+            className="mt-5 w-full bg-orange-500 text-white py-3.5 rounded-2xl font-black text-sm hover:bg-orange-600 active:scale-95 transition-all shadow-lg shadow-orange-200"
           >
             Bắt đầu quiz →
           </button>
@@ -220,31 +279,41 @@ export default function QuizFlow() {
     return (
       <div className="min-h-screen bg-white">
         <ProgressBar phase={phase} />
-        <div className="max-w-lg mx-auto px-4 pb-24 pt-4">
+        <div key={phase} className="max-w-lg mx-auto px-4 pb-28 pt-4 animate-fade-up">
           <div className="mb-6">
-            <span className="text-xs font-semibold text-orange-500 uppercase tracking-wider">Bước 1 · Ikigai-9</span>
-            <h2 className="text-xl font-bold text-gray-900 mt-1">Mức độ Ikigai hiện tại</h2>
+            <span className="text-xs font-bold text-orange-500 uppercase tracking-wider">Bước 1 · Ikigai-9</span>
+            <h2 className="text-xl font-black text-gray-900 mt-1">Mức độ Ikigai hiện tại</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Đánh giá từng câu từ 1 (không đồng ý) đến 7 (hoàn toàn đồng ý). ({answered}/9 đã chọn)
+              Đánh giá từng câu từ 1 (không đồng ý) → 7 (hoàn toàn đồng ý)
             </p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                  style={{ width: `${(answered / 9) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold text-orange-500 w-12 text-right">{answered}/9</span>
+            </div>
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             {IKIGAI9_STATEMENTS.map((statement, i) => (
               <div key={i} className="bg-gray-50 rounded-2xl p-4">
-                <p className="text-sm font-medium text-gray-800 mb-3">
-                  <span className="text-orange-500 font-bold mr-1">{i + 1}.</span>
+                <p className="text-sm font-semibold text-gray-800 mb-3">
+                  <span className="text-orange-500 font-black mr-1">{i + 1}.</span>
                   {statement}
                 </p>
-                <div className="flex gap-1.5 justify-between">
+                {/* Color scale buttons */}
+                <div className="flex gap-1 justify-between">
                   {[1, 2, 3, 4, 5, 6, 7].map((val) => (
                     <button
                       key={val}
                       onClick={() => setIkigai9(i, val)}
-                      className={`flex-1 h-9 rounded-xl text-sm font-semibold transition-all ${
+                      className={`flex-1 h-10 rounded-xl text-sm font-black transition-all duration-150 border ${
                         answers.ikigai9[i] === val
-                          ? "bg-orange-500 text-white shadow-md"
-                          : "bg-white border border-gray-200 text-gray-500 hover:border-orange-300"
+                          ? SCALE_SELECTED[val]
+                          : "bg-white border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600"
                       }`}
                     >
                       {val}
@@ -260,15 +329,21 @@ export default function QuizFlow() {
           </div>
 
           {error && <p className="mt-4 text-sm text-red-500 text-center">{error}</p>}
+        </div>
 
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-3 flex justify-end">
-            <button
-              onClick={advance}
-              className="bg-orange-500 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-orange-600 transition-colors text-sm"
-            >
-              Tiếp theo →
-            </button>
-          </div>
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={goBack}
+            className="text-gray-400 hover:text-gray-600 text-sm font-semibold flex items-center gap-1 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            ← Quay lại
+          </button>
+          <button
+            onClick={advance}
+            className="bg-orange-500 text-white px-8 py-2.5 rounded-xl font-black hover:bg-orange-600 active:scale-95 transition-all text-sm"
+          >
+            Tiếp theo →
+          </button>
         </div>
       </div>
     )
@@ -283,12 +358,12 @@ export default function QuizFlow() {
   return (
     <div className="min-h-screen bg-white">
       <ProgressBar phase={phase} />
-      <div className="max-w-lg mx-auto px-4 pb-24 pt-4">
+      <div key={phase} className="max-w-lg mx-auto px-4 pb-28 pt-4 animate-fade-up">
         <div className="mb-6">
-          <span className={`text-xs font-semibold uppercase tracking-wider ${pillar.colorClass.text}`}>
+          <span className={`text-xs font-bold uppercase tracking-wider ${pillar.colorClass.text}`}>
             Bước {pillarIdx + 2} · {pillar.label}
           </span>
-          <h2 className="text-xl font-bold text-gray-900 mt-1">
+          <h2 className="text-xl font-black text-gray-900 mt-1">
             {pillar.emoji} {pillar.label}
           </h2>
           <p className="text-sm text-gray-500 mt-1">{pillar.description}</p>
@@ -297,11 +372,11 @@ export default function QuizFlow() {
         <div className="space-y-4">
           {pillar.questions.map((q, i) => (
             <div key={i} className={`rounded-2xl border p-4 ${pillar.colorClass.bg} ${pillar.colorClass.border}`}>
-              <label className="block text-sm font-semibold text-gray-800 mb-1">
-                <span className={`font-bold mr-1 ${pillar.colorClass.text}`}>{i + 1}.</span>
+              <label className="block text-sm font-bold text-gray-800 mb-1">
+                <span className={`font-black mr-1 ${pillar.colorClass.text}`}>{i + 1}.</span>
                 {q.text}
               </label>
-              <p className={`text-xs mb-2 ${pillar.colorClass.hintText}`}>
+              <p className={`text-xs mb-2.5 ${pillar.colorClass.hintText}`}>
                 💬 {q.hint}
               </p>
               <textarea
@@ -311,21 +386,32 @@ export default function QuizFlow() {
                 rows={2}
                 className="w-full bg-white rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 resize-none"
               />
+              {pillarAnswers[i].length > 0 && (
+                <p className="text-xs text-gray-400 text-right mt-1">{pillarAnswers[i].length} ký tự</p>
+              )}
             </div>
           ))}
         </div>
 
         {error && <p className="mt-4 text-sm text-red-500 text-center">{error}</p>}
+      </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-3 flex items-center justify-between">
-          <span className="text-xs text-gray-400">{filledCount}/5 câu đã trả lời</span>
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <button
-            onClick={advance}
-            className={`text-white px-8 py-2.5 rounded-xl font-semibold transition-colors text-sm ${pillar.colorClass.button}`}
+            onClick={goBack}
+            className="text-gray-400 hover:text-gray-600 text-sm font-semibold flex items-center gap-1 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors"
           >
-            {phase === "income" ? "Xem kết quả →" : "Tiếp theo →"}
+            ← Quay lại
           </button>
+          <span className="text-xs text-gray-400">{filledCount}/5 câu</span>
         </div>
+        <button
+          onClick={advance}
+          className={`text-white px-8 py-2.5 rounded-xl font-black active:scale-95 transition-all text-sm ${pillar.colorClass.button}`}
+        >
+          {phase === "income" ? "Xem kết quả ✨" : "Tiếp theo →"}
+        </button>
       </div>
     </div>
   )
