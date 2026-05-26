@@ -34,8 +34,17 @@ function LoginForm() {
           options: { data: { name } },
         })
         if (error) throw error
-        setSuccess("Đăng ký thành công! Kiểm tra email để xác nhận tài khoản.")
-        setLoading(false)
+
+        // Try auto sign-in (works when email confirmation is disabled)
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        if (signInError) {
+          // Email confirmation required
+          setSuccess("Đăng ký thành công! Kiểm tra email để xác nhận tài khoản.")
+          setLoading(false)
+        } else {
+          router.push(redirect)
+          router.refresh()
+        }
         return
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
