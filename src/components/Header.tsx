@@ -2,12 +2,19 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
+// Pages that have their own header — hide the global one
+const HIDDEN_ON = ["/admin", "/dashboard", "/login", "/reset-password"]
+
 export default function Header() {
+  const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const supabase = createClient()
+
+  if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
